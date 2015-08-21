@@ -10,6 +10,10 @@
 		<h3 align="center">Register</h3>
 		<form:form method="POST" action="/JugglerUI/registerUser">
 			<table align="center">
+				<tr style="display: none;">
+					<td><form:label path="emailId">EmailId</form:label></td>
+					<td><form:input path="emailId" /></td>
+				</tr>
 				<tr>
 					<td><form:label path="hobbies">Hobbies</form:label></td>
 					<td><form:select multiple="multiple" path="hobbies"
