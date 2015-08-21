@@ -88,7 +88,7 @@ public class JuggerUIController {
 			ModelMap model) {
 		userVO.setUserStatus("Pending");
 		userVO.setActivationId("actId");
-		System.out.println(userVO);
+		
 		persistUserInfo(userVO, JugglerConstants.REST_PATH_CREATE_USER);
 		// send mail here
 		return JugglerConstants.JSP_PAGE_SIGNUP_SUCCESS;
@@ -98,7 +98,11 @@ public class JuggerUIController {
 	public @ResponseBody
 	ModelAndView register(@RequestParam(value = "actId") String actId,
 			@RequestParam(value = "userId") String userId, ModelMap model) {
-		// activate the user here
+		UserCreateVO vo = new UserCreateVO();
+		vo.setEmailId(userId);
+		vo.setActivationId(actId);
+		persistUserInfo(vo, "activateUser");
+		// activate the user above
 		List<String> hobbiesList = new ArrayList<String>();
 		hobbiesList.add("hobbie1");
 		hobbiesList.add("hobbie2");
@@ -106,7 +110,7 @@ public class JuggerUIController {
 		model.addAttribute(JugglerConstants.JSP_DROPDOWN_HOBBIES, hobbiesList);
 
 		return new ModelAndView(JugglerConstants.JSP_PAGE_REGISTER,
-				JugglerConstants.COMMAND, new UserCreateVO());
+				JugglerConstants.COMMAND, vo);
 	}
 
 	private void persistUserInfo(UserCreateVO userVO, String path) {
@@ -123,7 +127,8 @@ public class JuggerUIController {
 	}
 
 	@RequestMapping(value = "/registerUser", method = RequestMethod.POST)
-	public String registerUser(@ModelAttribute UserCreateVO userVO, ModelMap model) {
+	public String registerUser(@ModelAttribute UserCreateVO userVO,
+			ModelMap model) {
 		persistUserInfo(userVO, JugglerConstants.REST_PATH_UPDATE_USER);
 		return JugglerConstants.JSP_PAGE_LOGIN;
 	}
