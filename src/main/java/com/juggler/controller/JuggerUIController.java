@@ -31,12 +31,16 @@ import com.juggler.test.beans.HelloRequestScopeData;
 import com.juggler.test.beans.HelloSessionScopeData;
 import com.juggler.utils.ConnectionEstablisher;
 import com.juggler.utils.JugglerUtils;
+import com.juggler.utils.MailSender;
 
 @Controller()
 public class JuggerUIController {
 	ObjectMapper mapper = new ObjectMapper();
 	@Autowired
 	ConnectionEstablisher connectionEstablisher;
+
+	@Autowired
+	MailSender mailSender;
 
 	@Autowired
 	SessionVO sessionVO;
@@ -53,8 +57,7 @@ public class JuggerUIController {
 	}
 
 	@RequestMapping(value = "/login", method = RequestMethod.GET)
-	public ModelAndView login(
-			@RequestParam(value = "error", required = false) String error,
+	public ModelAndView login(@RequestParam(value = "error", required = false) String error,
 			@RequestParam(value = "logout", required = false) String logout) {
 
 		ModelAndView model = new ModelAndView();
@@ -79,24 +82,23 @@ public class JuggerUIController {
 	@RequestMapping(value = "/signUpPage", method = RequestMethod.GET)
 	public ModelAndView signUp(ModelMap model) {
 
-		return new ModelAndView(JugglerConstants.JSP_PAGE_SIGNUP,
-				JugglerConstants.COMMAND, new UserCreateVO());
+		return new ModelAndView(JugglerConstants.JSP_PAGE_SIGNUP, JugglerConstants.COMMAND, new UserCreateVO());
 	}
 
 	@RequestMapping(value = "/signUpSuccessPage", method = RequestMethod.POST)
-	public String signUpSuccess(@ModelAttribute UserCreateVO userVO,
-			ModelMap model) {
+	public String signUpSuccess(@ModelAttribute UserCreateVO userVO, ModelMap model) {
 		userVO.setUserStatus("Pending");
 		userVO.setActivationId("actId");
-		
+		mailSender.sendMail(userVO.getEmailId(),
+				"http://localhost:8080/JugglerUI/registerPage?actId=actId&userId=" + userVO.getEmailId());
+
 		persistUserInfo(userVO, JugglerConstants.REST_PATH_CREATE_USER);
 		// send mail here
 		return JugglerConstants.JSP_PAGE_SIGNUP_SUCCESS;
 	}
 
 	@RequestMapping(value = "/registerPage", method = RequestMethod.GET)
-	public @ResponseBody
-	ModelAndView register(@RequestParam(value = "actId") String actId,
+	public @ResponseBody ModelAndView register(@RequestParam(value = "actId") String actId,
 			@RequestParam(value = "userId") String userId, ModelMap model) {
 		UserCreateVO vo = new UserCreateVO();
 		vo.setEmailId(userId);
@@ -109,8 +111,7 @@ public class JuggerUIController {
 		hobbiesList.add("hobbie3");
 		model.addAttribute(JugglerConstants.JSP_DROPDOWN_HOBBIES, hobbiesList);
 
-		return new ModelAndView(JugglerConstants.JSP_PAGE_REGISTER,
-				JugglerConstants.COMMAND, vo);
+		return new ModelAndView(JugglerConstants.JSP_PAGE_REGISTER, JugglerConstants.COMMAND, vo);
 	}
 
 	private void persistUserInfo(UserCreateVO userVO, String path) {
@@ -118,8 +119,7 @@ public class JuggerUIController {
 		try {
 			Map<String, String> parameterMap = new HashMap<String, String>();
 			mapper.writeValue(writer, userVO);
-			parameterMap.put(JugglerConstants.REST_INPUT_USERJSON,
-					writer.toString());
+			parameterMap.put(JugglerConstants.REST_INPUT_USERJSON, writer.toString());
 			connectionEstablisher.connectRest(path, parameterMap);
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -127,8 +127,7 @@ public class JuggerUIController {
 	}
 
 	@RequestMapping(value = "/registerUser", method = RequestMethod.POST)
-	public String registerUser(@ModelAttribute UserCreateVO userVO,
-			ModelMap model) {
+	public String registerUser(@ModelAttribute UserCreateVO userVO, ModelMap model) {
 		persistUserInfo(userVO, JugglerConstants.REST_PATH_UPDATE_USER);
 		return JugglerConstants.JSP_PAGE_LOGIN;
 	}
@@ -136,17 +135,13 @@ public class JuggerUIController {
 	@RequestMapping(value = { "/welcome" }, method = RequestMethod.GET)
 	public String welcome(ModelMap model) {
 		try {
-			Authentication auth = SecurityContextHolder.getContext()
-					.getAuthentication();
+			Authentication auth = SecurityContextHolder.getContext().getAuthentication();
 			sessionVO.setUserId(auth.getName());
 			Map<String, String> parameterMap = new HashMap<String, String>();
-			parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_USER_ID,
-					sessionVO.getUserId());
-			String output = connectionEstablisher.connectRest(
-					JugglerConstants.REST_PATH_GET_USER_DETAIL, parameterMap);
+			parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_USER_ID, sessionVO.getUserId());
+			String output = connectionEstablisher.connectRest(JugglerConstants.REST_PATH_GET_USER_DETAIL, parameterMap);
 			JSONObject object = new JSONObject(output);
-			model.addAttribute(JugglerConstants.JSP_USER_NAME,
-					object.get(JugglerConstants.JSP_USER_NAME));
+			model.addAttribute(JugglerConstants.JSP_USER_NAME, object.get(JugglerConstants.JSP_USER_NAME));
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -168,53 +163,42 @@ public class JuggerUIController {
 		hobbiesList.add("hobbie2");
 		hobbiesList.add("hobbie3");
 		model.addAttribute(JugglerConstants.JSP_DROPDOWN_HOBBIES, hobbiesList);
-		return new ModelAndView(JugglerConstants.JSP_PAGE_CREATE_ACTIVITY,
-				JugglerConstants.COMMAND, new ActivityVO());
+		return new ModelAndView(JugglerConstants.JSP_PAGE_CREATE_ACTIVITY, JugglerConstants.COMMAND, new ActivityVO());
 	}
 
 	@RequestMapping(value = "/createActivity", method = RequestMethod.POST)
-	public ModelAndView createActivity(@ModelAttribute ActivityVO activityVO,
-			ModelMap model) {
+	public ModelAndView createActivity(@ModelAttribute ActivityVO activityVO, ModelMap model) {
 		StringWriter writer = new StringWriter();
 		try {
 			activityVO.setActivityOwnerId(sessionVO.getUserId());
 			Map<String, String> parameterMap = new HashMap<String, String>();
 			mapper.writeValue(writer, activityVO);
-			parameterMap.put(JugglerConstants.REST_INPUT_ACTIVITYJSON,
-					writer.toString());
-			connectionEstablisher.connectRest(
-					JugglerConstants.REST_PATH_ADD_ACTIVITY, parameterMap);
+			parameterMap.put(JugglerConstants.REST_INPUT_ACTIVITYJSON, writer.toString());
+			connectionEstablisher.connectRest(JugglerConstants.REST_PATH_ADD_ACTIVITY, parameterMap);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		return new ModelAndView(JugglerConstants.JSP_PAGE_CREATE_ACTIVITY,
-				JugglerConstants.COMMAND, new ActivityVO());
+		return new ModelAndView(JugglerConstants.JSP_PAGE_CREATE_ACTIVITY, JugglerConstants.COMMAND, new ActivityVO());
 	}
 
 	@RequestMapping(value = "/showFriendsActivity", method = RequestMethod.GET)
 	public ModelAndView showFriendsActivity(ModelMap model) {
-		ModelAndView modelAndView = new ModelAndView(
-				JugglerConstants.JSP_PAGE_FRIENDS_ACTIVITY);
+		ModelAndView modelAndView = new ModelAndView(JugglerConstants.JSP_PAGE_FRIENDS_ACTIVITY);
 		Map<String, String> parameterMap = new HashMap<String, String>();
 		List<ActionVO> actionVOList = new ArrayList<ActionVO>();
 		parameterMap.put(JugglerConstants.REST_INPUT_RETRIEVAL_TYPE, "friends");
-		parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_USER_ID,
-				sessionVO.getUserId());
+		parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_USER_ID, sessionVO.getUserId());
 		try {
-			String output = connectionEstablisher
-					.connectRest(JugglerConstants.REST_PATH_GET_ACTION_DETAILS,
-							parameterMap);
+			String output = connectionEstablisher.connectRest(JugglerConstants.REST_PATH_GET_ACTION_DETAILS,
+					parameterMap);
 			JSONArray array = new JSONArray(output);
 			for (int i = 0; i < array.length(); i++) {
-				ActionVO actionVO = JugglerUtils
-						.convertToActionObjectFromJsonString(array.getString(i));
+				ActionVO actionVO = JugglerUtils.convertToActionObjectFromJsonString(array.getString(i));
 				ActivityVO activityVO = getActivityVO(actionVO.getActivityId());
 				actionVO.setActivityVO(activityVO);
 
-				if (activityVO != null
-						&& activityVO.getParticipants() != null
-						&& activityVO.getParticipants().contains(
-								sessionVO.getUserId())) {
+				if (activityVO != null && activityVO.getParticipants() != null
+						&& activityVO.getParticipants().contains(sessionVO.getUserId())) {
 					actionVO.setParticipatedFlag(true);
 				}
 				actionVOList.add(actionVO);
@@ -232,16 +216,13 @@ public class JuggerUIController {
 		Map<String, String> parameterMap = new HashMap<String, String>();
 		List<ActionVO> actionVOList = new ArrayList<ActionVO>();
 		parameterMap.put(JugglerConstants.REST_INPUT_RETRIEVAL_TYPE, "userId");
-		parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_USER_ID,
-				sessionVO.getUserId());
+		parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_USER_ID, sessionVO.getUserId());
 		try {
-			String output = connectionEstablisher
-					.connectRest(JugglerConstants.REST_PATH_GET_ACTION_DETAILS,
-							parameterMap);
+			String output = connectionEstablisher.connectRest(JugglerConstants.REST_PATH_GET_ACTION_DETAILS,
+					parameterMap);
 			JSONArray array = new JSONArray(output);
 			for (int i = 0; i < array.length(); i++) {
-				ActionVO actionVO = JugglerUtils
-						.convertToActionObjectFromJsonString(array.getString(i));
+				ActionVO actionVO = JugglerUtils.convertToActionObjectFromJsonString(array.getString(i));
 				ActivityVO activityVO = getActivityVO(actionVO.getActivityId());
 				actionVO.setActivityVO(activityVO);
 				actionVOList.add(actionVO);
@@ -258,11 +239,9 @@ public class JuggerUIController {
 		Map<String, String> parameterMap = new HashMap<String, String>();
 		parameterMap.put(JugglerConstants.REST_INPUT_ACTIVITYID, activityId);
 		try {
-			String output = connectionEstablisher.connectRest(
-					JugglerConstants.REST_PATH_GET_ACTIVITY, parameterMap);
+			String output = connectionEstablisher.connectRest(JugglerConstants.REST_PATH_GET_ACTIVITY, parameterMap);
 
-			activityVO = JugglerUtils
-					.convertToActivityObjectFromJsonString(output);
+			activityVO = JugglerUtils.convertToActivityObjectFromJsonString(output);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -275,21 +254,16 @@ public class JuggerUIController {
 		Map<String, String> parameterMap = new HashMap<String, String>();
 		List<ActionVO> actionVOList = new ArrayList<ActionVO>();
 		parameterMap.put(JugglerConstants.REST_INPUT_RETRIEVAL_TYPE, "hobbies");
-		parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_USER_ID,
-				sessionVO.getUserId());
+		parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_USER_ID, sessionVO.getUserId());
 		try {
-			String output = connectionEstablisher.connectRest(
-					JugglerConstants.REST_PATH_GET_SUGGESTED_ACTIVITY,
+			String output = connectionEstablisher.connectRest(JugglerConstants.REST_PATH_GET_SUGGESTED_ACTIVITY,
 					parameterMap);
 			JSONArray array = new JSONArray(output);
 			for (int i = 0; i < array.length(); i++) {
 
-				ActivityVO activityVO = JugglerUtils
-						.convertToActivityObjectFromJsonString(array
-								.getString(i));
+				ActivityVO activityVO = JugglerUtils.convertToActivityObjectFromJsonString(array.getString(i));
 
-				ActionVO actionVO = JugglerUtils
-						.convertFromActivityVOToActionVO(activityVO);
+				ActionVO actionVO = JugglerUtils.convertFromActivityVOToActionVO(activityVO);
 				actionVO.setActivityVO(activityVO);
 
 				actionVOList.add(actionVO);
@@ -302,23 +276,17 @@ public class JuggerUIController {
 	}
 
 	@RequestMapping(value = { "/participateAction" }, method = RequestMethod.POST)
-	public @ResponseBody
-	void participateAction(@RequestParam(value = "activityId") String activityId) {
+	public @ResponseBody void participateAction(@RequestParam(value = "activityId") String activityId) {
 		try {
 			Map<String, String> parameterMap = new HashMap<String, String>();
-			parameterMap
-					.put(JugglerConstants.REST_INPUT_ACTIVITYID, activityId);
-			parameterMap.put(JugglerConstants.REST_INPUT_ACTION,
-					JugglerConstants.ACTION_PARTICIPATE);
-			parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_USER_ID,
-					sessionVO.getUserId());
-			connectionEstablisher.connectRest(
-					JugglerConstants.REST_PATH_PERSIST_ACTION, parameterMap);
+			parameterMap.put(JugglerConstants.REST_INPUT_ACTIVITYID, activityId);
+			parameterMap.put(JugglerConstants.REST_INPUT_ACTION, JugglerConstants.ACTION_PARTICIPATE);
+			parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_USER_ID, sessionVO.getUserId());
+			connectionEstablisher.connectRest(JugglerConstants.REST_PATH_PERSIST_ACTION, parameterMap);
 
 			Map<String, String> parameterMap2 = new HashMap<String, String>();
 			parameterMap2.put("activityId", activityId);
-			parameterMap2.put(JugglerConstants.REST_INPUT_VALIDATE_USER_ID,
-					sessionVO.getUserId());
+			parameterMap2.put(JugglerConstants.REST_INPUT_VALIDATE_USER_ID, sessionVO.getUserId());
 			connectionEstablisher.connectRest("addParticipant", parameterMap2);
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -335,23 +303,19 @@ public class JuggerUIController {
 
 	@RequestMapping(value = "/showFriendSuggestion", method = RequestMethod.GET)
 	public ModelAndView showFriendSuggestion(ModelMap model) {
-		ModelAndView modelAndView = new ModelAndView(
-				JugglerConstants.JSP_PAGE_FRIEND_SUGGESTION);
+		ModelAndView modelAndView = new ModelAndView(JugglerConstants.JSP_PAGE_FRIEND_SUGGESTION);
 		List<UserCreateVO> userCreateVOList = new ArrayList<UserCreateVO>();
 		try {
 
 			Map<String, String> parameterMap = new HashMap<String, String>();
-			parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_USER_ID,
-					sessionVO.getUserId());
-			String output = connectionEstablisher.connectRest(
-					JugglerConstants.REST_PATH_FRIEND_SUGGESTION, parameterMap);
+			parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_USER_ID, sessionVO.getUserId());
+			String output = connectionEstablisher.connectRest(JugglerConstants.REST_PATH_FRIEND_SUGGESTION,
+					parameterMap);
 			JSONArray array = new JSONArray(output);
 			for (int i = 0; i < array.length(); i++) {
-				userCreateVOList.add(JugglerUtils
-						.convertToUserObjectFromJsonString(array.getString(i)));
+				userCreateVOList.add(JugglerUtils.convertToUserObjectFromJsonString(array.getString(i)));
 			}
-			modelAndView.addObject(JugglerConstants.JSP_FRIEND_SUGGESTION,
-					userCreateVOList);
+			modelAndView.addObject(JugglerConstants.JSP_FRIEND_SUGGESTION, userCreateVOList);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -359,17 +323,13 @@ public class JuggerUIController {
 	}
 
 	@RequestMapping(value = { "/addFriend" }, method = RequestMethod.POST)
-	public @ResponseBody
-	String addFriend(@RequestParam(value = "friendId") String friendId) {
+	public @ResponseBody String addFriend(@RequestParam(value = "friendId") String friendId) {
 		Map<String, String> parameterMap = new HashMap<String, String>();
 		try {
 
-			parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_USER_ID,
-					sessionVO.getUserId());
-			parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_FRIEND_ID,
-					friendId);
-			connectionEstablisher.connectRest(
-					JugglerConstants.REST_PATH_ADD_FRIEND, parameterMap);
+			parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_USER_ID, sessionVO.getUserId());
+			parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_FRIEND_ID, friendId);
+			connectionEstablisher.connectRest(JugglerConstants.REST_PATH_ADD_FRIEND, parameterMap);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -377,15 +337,12 @@ public class JuggerUIController {
 	}
 
 	@RequestMapping(value = { "/removeFriend" }, method = RequestMethod.POST)
-	public @ResponseBody
-	String removeFriend(@RequestParam(value = "friendId") String friendId) {
+	public @ResponseBody String removeFriend(@RequestParam(value = "friendId") String friendId) {
 		Map<String, String> parameterMap = new HashMap<String, String>();
 		try {
 
-			parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_USER_ID,
-					sessionVO.getUserId());
-			parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_FRIEND_ID,
-					friendId);
+			parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_USER_ID, sessionVO.getUserId());
+			parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_FRIEND_ID, friendId);
 			connectionEstablisher.connectRest("removeFriend", parameterMap);
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -394,17 +351,13 @@ public class JuggerUIController {
 	}
 
 	@RequestMapping(value = { "/acceptFriend" }, method = RequestMethod.POST)
-	public @ResponseBody
-	String acceptFriend(@RequestParam(value = "friendId") String friendId) {
+	public @ResponseBody String acceptFriend(@RequestParam(value = "friendId") String friendId) {
 		Map<String, String> parameterMap = new HashMap<String, String>();
 		try {
 
-			parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_USER_ID,
-					sessionVO.getUserId());
-			parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_FRIEND_ID,
-					friendId);
-			connectionEstablisher.connectRest(
-					JugglerConstants.REST_PATH_ACCEPT_FRIEND, parameterMap);
+			parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_USER_ID, sessionVO.getUserId());
+			parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_FRIEND_ID, friendId);
+			connectionEstablisher.connectRest(JugglerConstants.REST_PATH_ACCEPT_FRIEND, parameterMap);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -412,17 +365,13 @@ public class JuggerUIController {
 	}
 
 	@RequestMapping(value = { "/cancelFriend" }, method = RequestMethod.POST)
-	public @ResponseBody
-	String cancelFriend(@RequestParam(value = "friendId") String friendId) {
+	public @ResponseBody String cancelFriend(@RequestParam(value = "friendId") String friendId) {
 		Map<String, String> parameterMap = new HashMap<String, String>();
 		try {
 
-			parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_USER_ID,
-					sessionVO.getUserId());
-			parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_FRIEND_ID,
-					friendId);
-			connectionEstablisher.connectRest(
-					JugglerConstants.REST_PATH_CANCEL_FRIEND, parameterMap);
+			parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_USER_ID, sessionVO.getUserId());
+			parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_FRIEND_ID, friendId);
+			connectionEstablisher.connectRest(JugglerConstants.REST_PATH_CANCEL_FRIEND, parameterMap);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -431,25 +380,20 @@ public class JuggerUIController {
 
 	@RequestMapping(value = "/showSentFriendRequest", method = RequestMethod.GET)
 	public ModelAndView showSentFriendRequest(ModelMap model) {
-		ModelAndView modelAndView = new ModelAndView(
-				JugglerConstants.JSP_PAGE_SENT_FRIEND_REQUEST);
+		ModelAndView modelAndView = new ModelAndView(JugglerConstants.JSP_PAGE_SENT_FRIEND_REQUEST);
 		Map<String, String> parameterMap = new HashMap<String, String>();
 		List<UserCreateVO> userCreateVOList = new ArrayList<UserCreateVO>();
 		parameterMap.put(JugglerConstants.REST_INPUT_RETRIEVAL_TYPE,
 				JugglerConstants.REST_INPUT_RECIEVED_FRIEND_REQUESTS);
-		parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_USER_ID,
-				sessionVO.getUserId());
+		parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_USER_ID, sessionVO.getUserId());
 		try {
-			String output = connectionEstablisher.connectRest(
-					JugglerConstants.REST_PATH_GET_USER_FRIEND_DETAILS,
+			String output = connectionEstablisher.connectRest(JugglerConstants.REST_PATH_GET_USER_FRIEND_DETAILS,
 					parameterMap);
 			JSONArray array = new JSONArray(output);
 			for (int i = 0; i < array.length(); i++) {
-				userCreateVOList.add(JugglerUtils
-						.convertToUserObjectFromJsonString(array.getString(i)));
+				userCreateVOList.add(JugglerUtils.convertToUserObjectFromJsonString(array.getString(i)));
 			}
-			modelAndView.addObject(JugglerConstants.JSP_SENT_FRIEND_REQUEST,
-					userCreateVOList);
+			modelAndView.addObject(JugglerConstants.JSP_SENT_FRIEND_REQUEST, userCreateVOList);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -458,26 +402,19 @@ public class JuggerUIController {
 
 	@RequestMapping(value = "/showRecievedFriendRequest", method = RequestMethod.GET)
 	public ModelAndView showRecievedFriendRequest(ModelMap model) {
-		ModelAndView modelAndView = new ModelAndView(
-				JugglerConstants.JSP_PAGE_RECIEVED_FRIEND_REQUEST);
+		ModelAndView modelAndView = new ModelAndView(JugglerConstants.JSP_PAGE_RECIEVED_FRIEND_REQUEST);
 		Map<String, String> parameterMap = new HashMap<String, String>();
 		List<UserCreateVO> userCreateVOList = new ArrayList<UserCreateVO>();
-		parameterMap.put(JugglerConstants.REST_INPUT_RETRIEVAL_TYPE,
-				JugglerConstants.REST_INPUT_SENT_FRIEND_REQUESTS);
-		parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_USER_ID,
-				sessionVO.getUserId());
+		parameterMap.put(JugglerConstants.REST_INPUT_RETRIEVAL_TYPE, JugglerConstants.REST_INPUT_SENT_FRIEND_REQUESTS);
+		parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_USER_ID, sessionVO.getUserId());
 		try {
-			String output = connectionEstablisher.connectRest(
-					JugglerConstants.REST_PATH_GET_USER_FRIEND_DETAILS,
+			String output = connectionEstablisher.connectRest(JugglerConstants.REST_PATH_GET_USER_FRIEND_DETAILS,
 					parameterMap);
 			JSONArray array = new JSONArray(output);
 			for (int i = 0; i < array.length(); i++) {
-				userCreateVOList.add(JugglerUtils
-						.convertToUserObjectFromJsonString(array.getString(i)));
+				userCreateVOList.add(JugglerUtils.convertToUserObjectFromJsonString(array.getString(i)));
 			}
-			modelAndView.addObject(
-					JugglerConstants.JSP_RECIEVED_FRIEND_REQUEST,
-					userCreateVOList);
+			modelAndView.addObject(JugglerConstants.JSP_RECIEVED_FRIEND_REQUEST, userCreateVOList);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -486,25 +423,19 @@ public class JuggerUIController {
 
 	@RequestMapping(value = "/showMyFriends", method = RequestMethod.GET)
 	public ModelAndView showMyFriends(ModelMap model) {
-		ModelAndView modelAndView = new ModelAndView(
-				JugglerConstants.JSP_PAGE_MY_FRIENDS);
+		ModelAndView modelAndView = new ModelAndView(JugglerConstants.JSP_PAGE_MY_FRIENDS);
 		Map<String, String> parameterMap = new HashMap<String, String>();
 		List<UserCreateVO> userCreateVOList = new ArrayList<UserCreateVO>();
-		parameterMap.put(JugglerConstants.REST_INPUT_RETRIEVAL_TYPE,
-				JugglerConstants.REST_INPUT_FRIENDS);
-		parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_USER_ID,
-				sessionVO.getUserId());
+		parameterMap.put(JugglerConstants.REST_INPUT_RETRIEVAL_TYPE, JugglerConstants.REST_INPUT_FRIENDS);
+		parameterMap.put(JugglerConstants.REST_INPUT_VALIDATE_USER_ID, sessionVO.getUserId());
 		try {
-			String output = connectionEstablisher.connectRest(
-					JugglerConstants.REST_PATH_GET_USER_FRIEND_DETAILS,
+			String output = connectionEstablisher.connectRest(JugglerConstants.REST_PATH_GET_USER_FRIEND_DETAILS,
 					parameterMap);
 			JSONArray array = new JSONArray(output);
 			for (int i = 0; i < array.length(); i++) {
-				userCreateVOList.add(JugglerUtils
-						.convertToUserObjectFromJsonString(array.getString(i)));
+				userCreateVOList.add(JugglerUtils.convertToUserObjectFromJsonString(array.getString(i)));
 			}
-			modelAndView.addObject(JugglerConstants.JSP_MY_FRIENDS,
-					userCreateVOList);
+			modelAndView.addObject(JugglerConstants.JSP_MY_FRIENDS, userCreateVOList);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

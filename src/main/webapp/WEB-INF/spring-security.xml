@@ -38,7 +38,11 @@
 		class="com.juggler.test.impl.HelloRequestScopeDataImpl" scope="request">
 		<aop:scoped-proxy proxy-target-class="false" />
 	</beans:bean>
-	<beans:bean id="requestIdHolder" class="com.juggler.test.RequestIdHolder" scope="request"></beans:bean>
+	<beans:bean id="requestIdHolder" class="com.juggler.test.RequestIdHolder"
+		scope="request"></beans:bean>
+
+	<beans:bean id="mailSender" class="com.juggler.utils.MailSender"
+		scope="singleton"></beans:bean>
 
 	<beans:bean id="sessionscope"
 		class="com.juggler.test.impl.HelloSessionScopeDataImpl" scope="session">
